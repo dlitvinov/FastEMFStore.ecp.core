@@ -20,8 +20,11 @@ import org.eclipse.emf.ecp.common.model.ECPModelelementContext;
 import org.eclipse.emf.ecp.common.model.workSpaceModel.util.AssociationClassHelper;
 import org.eclipse.emf.edit.provider.ComposedAdapterFactory;
 import org.eclipse.emf.edit.ui.provider.AdapterFactoryLabelProvider;
+import org.eclipse.jface.action.IStatusLineManager;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.dialogs.ProgressMonitorDialog;
+import org.eclipse.ui.IActionBars;
+import org.eclipse.ui.IViewSite;
 import org.eclipse.ui.PlatformUI;
 
 /**
@@ -76,6 +79,7 @@ public final class DeleteModelElementCommand {
 				.getActiveWorkbenchWindow().getShell());
 			progressDialog.open();
 			try {
+				long start = System.currentTimeMillis();
 				removeElementsWithoutRoot(toBeDeleted);
 
 				if (toBeDeleted.size() > 0) {
@@ -90,11 +94,34 @@ public final class DeleteModelElementCommand {
 
 					}.run(toBeDeleted);
 				}
+				setStatusMessage("Element deletion lasted "
+						+ (System.currentTimeMillis() - start) / 1000.0 + "sec");
 				// Command deleteCommand = DeleteCommand.create(context.getEditingDomain(), toBeDeleted);
 				// context.getEditingDomain().getCommandStack().execute(deleteCommand);
 			} finally {
 				progressDialog.getProgressMonitor().done();
 				progressDialog.close();
+			}
+		}
+	}
+
+	/**
+	 * Sets a message in the status line, if removes it, if message == null
+	 * 
+	 * @param message
+	 *            the message to be set
+	 */
+	public static void setStatusMessage(String message) {
+		IViewSite vSite = (IViewSite) PlatformUI.getWorkbench()
+				.getActiveWorkbenchWindow().getActivePage().getActivePart()
+				.getSite();
+		IActionBars actionBars = vSite.getActionBars();
+		if (actionBars != null) {
+			IStatusLineManager statusLineManager = actionBars
+					.getStatusLineManager();
+			if (statusLineManager != null) {
+				statusLineManager.setMessage(message);
+				System.out.println(message);
 			}
 		}
 	}
