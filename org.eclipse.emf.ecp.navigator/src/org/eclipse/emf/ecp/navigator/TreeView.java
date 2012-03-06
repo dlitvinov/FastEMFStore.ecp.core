@@ -10,8 +10,12 @@
  ******************************************************************************/
 package org.eclipse.emf.ecp.navigator;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.eclipse.emf.common.notify.Notification;
 import org.eclipse.emf.common.notify.impl.AdapterImpl;
+import org.eclipse.emf.common.util.TreeIterator;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecp.common.dnd.ComposedDropAdapter;
 import org.eclipse.emf.ecp.common.dnd.UCDragAdapter;
@@ -67,7 +71,6 @@ public class TreeView extends ViewPart implements ISelectionListener { // implem
 	private ECPWorkspace currentWorkspace;
 	private AdapterImpl workspaceListenerAdapter;
 	private boolean internalSelectionEvent;
-	private TreeLabelProvider labelProvider;
 
 	/**
 	 * Constructor.
@@ -107,9 +110,6 @@ public class TreeView extends ViewPart implements ISelectionListener { // implem
 		PlatformUI.getWorkbench().getActiveWorkbenchWindow().getSelectionService().removeSelectionListener(this);
 		getSite().getPage().removePartListener(partListener);
 		currentWorkspace.eAdapters().remove(workspaceListenerAdapter);
-		if (labelProvider != null) {
-			labelProvider.dispose();
-		}
 		super.dispose();
 	}
 
@@ -123,8 +123,7 @@ public class TreeView extends ViewPart implements ISelectionListener { // implem
 		try {
 			ECPWorkspace workSpace = ECPWorkspaceManager.getInstance().getWorkSpace();
 			IDecoratorManager decoratorManager = PlatformUI.getWorkbench().getDecoratorManager();
-			labelProvider = new TreeLabelProvider();
-			viewer.setLabelProvider(labelProvider.getLabelProvider());
+			viewer.setLabelProvider(new TreeLabelProvider().getLabelProvider());
 			// viewer.setLabelProvider(new TreeLabelProvider());
 			viewer.setContentProvider(new TreeContentProvider());
 			viewer.setUseHashlookup(true);
@@ -443,14 +442,29 @@ public class TreeView extends ViewPart implements ISelectionListener { // implem
 	 *      org.eclipse.jface.viewers.ISelection)
 	 */
 	public void selectionChanged(IWorkbenchPart part, ISelection selection) {
+		if (selection == null) {
+			return;
+		}
 		if (part == this) {
-			return;
+			Object[] nodes = ((IStructuredSelection) selection).toArray();
+			List<EObject> eObjects = new ArrayList<EObject>(nodes.length);
+			for (Object node: nodes) {
+				if (node instanceof TreeNode) {
+					Object element = ((TreeNode) node).getValue();
+					if (element instanceof EObject) {
+						eObjects.add((EObject) element);
+					}
+				} else if (node instanceof EObject) {
+					eObjects.add((EObject) node);
+				}
+			}
+			showElementsSize(eObjects);
+		} else {
+			EObject element = extractObjectFromSelection(selection);
+			if (element != null) {
+				revealME(element);		
+			}
 		}
-		EObject element = extractObjectFromSelection(selection);
-		if (element == null) {
-			return;
-		}
-		revealME(element);
 	}
 
 	private EObject extractObjectFromSelection(ISelection selection) {
@@ -473,5 +487,36 @@ public class TreeView extends ViewPart implements ISelectionListener { // implem
 
 		return null;
 	}
+	
+	private void showElementsSize(List<EObject> list) {
+		int childrenNo = 0;
+		for (EObject element: list) {
+			for (TreeIterator<EObject> iterator = element.eAllContents();
+					iterator.hasNext(); iterator.next()) { 
+				childrenNo++;
+			}
+		}
+		String message = list.size() + " objects with " + childrenNo + " children selected. Total: "
+			+ (list.size() + childrenNo) + " objects";
+		getViewSite().getActionBars().getStatusLineManager().setMessage(message);
+	}
 
+	private void showElementSize(EObject element) {
+		String message = null;
+//		if (element instanceof ProjectSpace) {
+//			int size = ((ProjectSpace)element).getProject().getAllModelElements().size();
+//			message = "Project has " + size + " elements";
+//		} 
+//		else {
+			int size = 0;
+			for (TreeIterator<EObject> iterator = element.eAllContents();
+					iterator.hasNext(); iterator.next()) { 
+				size++;
+			}
+			if (size > 0) {
+				message = "Object has " + size + " children";
+			}
+//		}
+		getViewSite().getActionBars().getStatusLineManager().setMessage(message);
+	}
 }
